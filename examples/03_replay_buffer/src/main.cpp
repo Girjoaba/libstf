@@ -139,15 +139,26 @@ size_t enqueue_stream_output(std::shared_ptr<coyote::cThread> cthread,
 }
 
 /**
- * Moves the given memory to the card memory. Coyote always migrates whole mapped buffers, so we
- * off-load with a single call. Otherwise, every call would copy the whole buffer again.
+ * Moves the given memory to the card memory. Coyote finds the mapped pages only by their start
+ * address and migrates them completely, so we off-load every page once from its start. An
+ * off-load can be at most MAX_TRANSFER_SIZE bytes, but the whole page is still migrated.
  */
-void offload_to_card(std::shared_ptr<coyote::cThread> cthread, void *ptr, size_t size) {
-    coyote::syncSg sg;
-    sg.addr = ptr;
-    sg.len  = size;
+void offload_to_card(std::shared_ptr<coyote::cThread> cthread,
+                     std::shared_ptr<libstf::MemoryPool> mem_pool, void *ptr, size_t size) {
+    auto byte_ptr = static_cast<std::byte *>(ptr);
+    auto end      = byte_ptr + size;
 
-    cthread->invoke(coyote::CoyoteOper::LOCAL_OFFLOAD, sg);
+    while (byte_ptr < end) {
+        auto [page, page_size] = mem_pool->get_page_boundaries(byte_ptr);
+        auto page_end          = static_cast<std::byte *>(page) + page_size;
+
+        coyote::syncSg sg;
+        sg.addr = byte_ptr;
+        sg.len  = std::min<size_t>(std::min(page_end, end) - byte_ptr, coyote::MAX_TRANSFER_SIZE);
+
+        cthread->invoke(coyote::CoyoteOper::LOCAL_OFFLOAD, sg);
+        byte_ptr = page_end;
+    }
 }
 
 /**
@@ -322,7 +333,7 @@ int main(int argc, char *argv[]) {
     // Move the ring buffer to the card memory and configure the replay buffer with it
     std::cout << std::endl << "Offloading the ring buffer to card memory..." << std::endl;
     tlb_manager->ensure_tlb_mapping(ring_buffer, ring_alloc_bytes);
-    offload_to_card(cthread, ring_buffer, ring_alloc_bytes);
+    offload_to_card(cthread, mem_pool, ring_buffer, ring_alloc_bytes);
     replay_buffer_config->configure_ring_buffer(0, reinterpret_cast<uint64_t>(ring_buffer),
                                                 args.ring_bytes);
 
