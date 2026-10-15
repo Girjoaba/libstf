@@ -44,7 +44,16 @@ typedef uint8_t stream_t; // Type that holds a stream_id
 
 typedef std::bitset<MAXIMUM_FPGA_NUM_STREAMS> stream_mask_t;
 
-enum class type_t : unsigned char { BYTE_T, INT32_T, INT64_T, FLOAT_T, DOUBLE_T, NUM_TYPES };
+// Keep the order in sync with type_t in hardware/src/hdl/common.sv.
+enum class type_t : unsigned char {
+    BYTE_T,
+    INT32_T,
+    INT64_T,
+    FLOAT_T,
+    DOUBLE_T,
+    INT16_T,
+    NUM_TYPES
+};
 
 std::ostream &operator<<(std::ostream &out, const type_t &data_type);
 
@@ -60,6 +69,8 @@ constexpr size_t size_of(type_t type) {
         return 4;
     case type_t::DOUBLE_T:
         return 8;
+    case type_t::INT16_T:
+        return 2;
     case type_t::NUM_TYPES:
         break;
     }
@@ -82,13 +93,15 @@ auto dispatch_type(libstf::type_t type, Func &&func, Args &&...args) {
         return func.template operator()<float>(std::forward<Args>(args)...);
     case libstf::type_t::DOUBLE_T:
         return func.template operator()<double>(std::forward<Args>(args)...);
+    case libstf::type_t::INT16_T:
+        return func.template operator()<int16_t>(std::forward<Args>(args)...);
     case type_t::NUM_TYPES:
         break;
     }
     throw std::invalid_argument("Invalid type");
 }
 
-using Value = std::variant<std::byte, int32_t, int64_t, float, double>;
+using Value = std::variant<std::byte, int32_t, int64_t, float, double, int16_t>;
 
 } // namespace libstf
 

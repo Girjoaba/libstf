@@ -125,6 +125,9 @@ always_comb begin
         BYTE_T: begin
             in_num_elements = in_num_bytes;
         end
+        INT16_T: begin
+            in_num_elements = in_num_bytes / 2;
+        end
         INT32_T, FLOAT_T: begin
             in_num_elements = in_num_bytes / 4;
         end

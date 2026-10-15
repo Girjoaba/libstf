@@ -48,7 +48,8 @@ typedef enum logic[2:0] {
     INT32_T,
     INT64_T,
     FLOAT_T,
-    DOUBLE_T
+    DOUBLE_T,
+    INT16_T
 } type_t;
 
 // Aggregated StreamProfiler counters for a single stream.
@@ -92,6 +93,9 @@ function automatic int GET_TYPE_WIDTH(type_t data_type);
     case (data_type)
         BYTE_T: begin
             return 8;
+        end
+        INT16_T: begin
+            return 16;
         end
         INT32_T, FLOAT_T: begin
             return 32;

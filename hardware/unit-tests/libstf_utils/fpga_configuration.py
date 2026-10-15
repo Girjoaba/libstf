@@ -22,6 +22,8 @@ def stream_type_to_libstf_type_t(data_type: StreamType) -> int:
         return 3
     elif data_type == StreamType.FLOAT_64:
         return 4
+    elif data_type == StreamType.SIGNED_INT_16 or data_type == StreamType.UNSIGNED_INT_16:
+        return 5
     else:
         raise TypeError(f"The provided StreamType cannot be cast to libstf's type_t: {repr(data_type)}")
 
