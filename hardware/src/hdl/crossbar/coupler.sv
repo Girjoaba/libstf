@@ -31,7 +31,7 @@ typedef struct packed {
 logic[NUM_ELEMENTS - 1:0] in_valid;
 logic                     data_beat_complete;
 
-ready_valid_i #(mask_t)               curr_mask(clk, rst_n);
+ready_valid_i #(mask_t)               fifo_mask(clk, rst_n), curr_mask(clk, rst_n);
 ndata_i       #(data_t, NUM_ELEMENTS) internal(clk, rst_n);
 
 MehdiFIFO #(
@@ -45,11 +45,19 @@ MehdiFIFO #(
     .i_valid(mask.valid),
     .i_ready(),
 
-    .o_data(curr_mask.data),
-    .o_valid(curr_mask.valid),
-    .o_ready(curr_mask.ready),
+    .o_data(fifo_mask.data),
+    .o_valid(fifo_mask.valid),
+    .o_ready(fifo_mask.ready),
 
     .o_filling_level()
+);
+
+SkidBuffer #(mask_t) inst_mask_skid_buffer (
+    .clk(clk),
+    .rst_n(rst_n),
+
+    .in(fifo_mask),
+    .out(curr_mask)
 );
 
 assign curr_mask.ready = data_beat_complete && internal.ready;

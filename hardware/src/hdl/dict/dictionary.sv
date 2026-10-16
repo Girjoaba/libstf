@@ -63,6 +63,7 @@ ndata_i  #(value_t, NUM_BANKS) values_converted(clk, rst_n);
 
 ndata_i  #(id_t, NUM_ELEMENTS) creditor_out(clk, rst_n);
 ndata_i  #(id_t, NUM_ELEMENTS) deduplicate_out(clk, rst_n);
+ndata_i  #(id_t, NUM_ELEMENTS) decoupler_in(clk, rst_n);
 tagged_i #(id_t, SERIAL_WIDTH) decoupler_out[NUM_ELEMENTS](clk, rst_n);
 
 data_i #(value_t) value_decoupler_out[NUM_BANKS](clk, rst_n);
@@ -109,6 +110,15 @@ Decoupler #(
 assign coupler_mask.data  = {deduplicate_out.keep, deduplicate_out.last};
 assign coupler_mask.valid = deduplicate_out.valid && deduplicate_out.ready;
 
+logic credit_return;
+ShiftRegister #(.WIDTH(1), .LEVELS(1)) inst_credit_return_sr (
+    .clk(clk),
+    .rst_n(reset_synced),
+
+    .i_data(out.valid && out.ready),
+    .o_data(credit_return)
+);
+
 Creditor #(
     .MAX_IN_TRANSIT(MAX_IN_TRANSIT)
 ) inst_creditor (
@@ -118,7 +128,7 @@ Creditor #(
     .in(in_ids),
     .out(creditor_out),
 
-    .credit_return(out.valid && out.ready)
+    .credit_return(credit_return)
 );
 
 Deduplicate #(
@@ -133,6 +143,14 @@ Deduplicate #(
     .out(deduplicate_out)
 );
 
+NDataSkidBuffer #(id_t, NUM_ELEMENTS) inst_decoupler_skid_buffer (
+    .clk(clk),
+    .rst_n(reset_synced),
+
+    .in(deduplicate_out),
+    .out(decoupler_in)
+);
+
 ReorderDecoupler #(
     .data_t(id_t),
     .NUM_ELEMENTS(NUM_ELEMENTS),
@@ -141,7 +159,7 @@ ReorderDecoupler #(
     .clk(clk),
     .rst_n(reset_synced),
 
-    .in(deduplicate_out),
+    .in(decoupler_in),
     .out(decoupler_out)
 );
 

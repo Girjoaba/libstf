@@ -35,6 +35,7 @@ always_ff @(posedge clk) begin
 end
 
 ndata_i #(typed_dictionary_data_t, NUM_ELEMENTS) dictionary_in_values(clk, rst_n);
+ndata_i #(id_t,                    NUM_ELEMENTS) split_ids(clk, rst_n);
 ndata_i #(id_t,                    NUM_ELEMENTS) dictionary_in_ids(clk, rst_n);
 ndata_i #(typed_dictionary_data_t, NUM_ELEMENTS) dictionary_out(clk, rst_n);
 
@@ -88,10 +89,10 @@ always_ff @(posedge clk) begin
         // ids). As such, we must buffer the second half of the databeat
         // and provide it as input to the dictionary decoder in the next batch.
         // This will be done by the the combinatorial logic.
-        if (typ.valid && GET_TYPE_WIDTH(typ.data) == 64 && dictionary_in_ids.ready && dictionary_in_ids.valid) begin
+        if (typ.valid && GET_TYPE_WIDTH(typ.data) == 64 && split_ids.ready && split_ids.valid) begin
             if (state.valid) begin
                 // The buffered in_values data has been consumed (since we
-                // handshaked on dictionary_in_ids in this cycle), so mark it
+                // handshaked on split_ids in this cycle), so mark it
                 // as invalid.
                 state.valid <= 0;
             end else begin
@@ -117,44 +118,52 @@ else $fatal(1, "Module TypedDictionary only supports types that are either 32 or
 // -- Logic ----------------------------------------------------------------------------------------
 always_comb begin
     // We need to provide default values to prevent latch inference
-    dictionary_in_ids.data  = 'x;
-    dictionary_in_ids.keep  = 'x;
-    dictionary_in_ids.last  = 'x;
-    dictionary_in_ids.valid = 1'b0;
-    in_ids.ready            = 1'b0;
+    split_ids.data  = 'x;
+    split_ids.keep  = 'x;
+    split_ids.last  = 'x;
+    split_ids.valid = 1'b0;
+    in_ids.ready    = 1'b0;
 
     case (GET_TYPE_WIDTH(typ.data))
         32: begin
-            dictionary_in_ids.data   = in_ids.data;
-            dictionary_in_ids.keep   = in_ids.keep;
-            dictionary_in_ids.last   = in_ids.last;
-            dictionary_in_ids.valid  = in_ids.valid;
-            in_ids.ready             = dictionary_in_ids.ready;
+            split_ids.data  = in_ids.data;
+            split_ids.keep  = in_ids.keep;
+            split_ids.last  = in_ids.last;
+            split_ids.valid = in_ids.valid;
+            in_ids.ready    = split_ids.ready;
         end
 
         64: begin
             if (state.valid) begin
-                dictionary_in_ids.data  = state.data;
-                dictionary_in_ids.keep  = state.keep;
-                dictionary_in_ids.last  = state.last;
-                dictionary_in_ids.valid = 1;
-                in_ids.ready            = 0;
+                split_ids.data  = state.data;
+                split_ids.keep  = state.keep;
+                split_ids.last  = state.last;
+                split_ids.valid = 1;
+                in_ids.ready    = 0;
             end else begin
-                dictionary_in_ids.data  = double_ids_data[NUM_ELEMENTS - 1:0];
-                dictionary_in_ids.keep  = double_ids_keep[NUM_ELEMENTS - 1:0];
+                split_ids.data  = double_ids_data[NUM_ELEMENTS - 1:0];
+                split_ids.keep  = double_ids_keep[NUM_ELEMENTS - 1:0];
                 // We're submitting the first half of the *last* IDs to read,
                 // but possibly we have more IDs to read in the second half,
                 // and thus we shall send the last signal then (in the next
                 // databeat).
                 // If, we don't have a second half worth of data to send, then
                 // we shall set last to high here.
-                dictionary_in_ids.last  = in_ids.last && ~keep_second_half;
-                dictionary_in_ids.valid = in_ids.valid;
-                in_ids.ready            = dictionary_in_ids.ready;
+                split_ids.last  = in_ids.last && ~keep_second_half;
+                split_ids.valid = in_ids.valid;
+                in_ids.ready    = split_ids.ready;
             end
         end
     endcase
 end
+
+NDataSkidBuffer #(id_t, NUM_ELEMENTS) inst_ids_skid_buffer (
+    .clk(clk),
+    .rst_n(rst_n),
+
+    .in(split_ids),
+    .out(dictionary_in_ids)
+);
 
 Dictionary #(
     .value_t(data32_t),

@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+`include "libstf_macros.svh"
+
 /**
  * The Reorder module reorders a data stream that may have been shuffled out of order based on a 
  * pre-assigned serial number passed as the tag.
@@ -15,6 +17,8 @@ module Reorder #(
     tagged_i.s in, // #(data_t, SERIAL_WIDTH)
     data_i.m  out  // #(data_t)
 );
+
+`RESET_RESYNC // Reset pipelining
 
 localparam DATA_WIDTH = $bits(data_t);
 localparam RAM_WIDTH = DATA_WIDTH + 2;
@@ -48,7 +52,7 @@ RAM #(
 );
 
 always_ff @(posedge clk) begin
-    if (!rst_n) begin
+    if (!reset_synced) begin
         next      <= 0;
         ram_valid <= '0;
 
