@@ -39,8 +39,8 @@ end
 
 // Shift registers with depth matching that of the hasher pipeline for all other values that we need for the output
 ReadyShiftRegister #($bits(tuple_t) * NUM_TUPLES, NUM_PIPE_STAGES) inst_data_sr (
-    .i_clk(clk),
-    .i_rst_n(rst_n),
+    .clk(clk),
+    .rst_n(rst_n),
 
     .i_data(in.data),
     .o_ready(),
@@ -50,8 +50,8 @@ ReadyShiftRegister #($bits(tuple_t) * NUM_TUPLES, NUM_PIPE_STAGES) inst_data_sr 
 );
 
 ReadyShiftRegister #(NUM_TUPLES, NUM_PIPE_STAGES) inst_keep_sr (
-    .i_clk(clk),
-    .i_rst_n(rst_n),
+    .clk(clk),
+    .rst_n(rst_n),
 
     .i_data(in.keep),
     .o_ready(),
@@ -61,8 +61,8 @@ ReadyShiftRegister #(NUM_TUPLES, NUM_PIPE_STAGES) inst_keep_sr (
 );
 
 ReadyShiftRegister #(1, NUM_PIPE_STAGES) inst_last_sr (
-    .i_clk(clk),
-    .i_rst_n(rst_n),
+    .clk(clk),
+    .rst_n(rst_n),
 
     .i_data(in.last),
     .o_ready(),
@@ -72,8 +72,8 @@ ReadyShiftRegister #(1, NUM_PIPE_STAGES) inst_last_sr (
 );
 
 ReadyShiftRegister #(1, NUM_PIPE_STAGES) inst_valid_sr (
-    .i_clk(clk),
-    .i_rst_n(rst_n),
+    .clk(clk),
+    .rst_n(rst_n),
 
     .i_data(in.valid),
     .o_ready(),

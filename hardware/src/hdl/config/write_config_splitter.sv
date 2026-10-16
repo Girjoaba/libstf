@@ -44,8 +44,8 @@ for (genvar I = 0; I < NUM_CONFIGS; I++) begin
     assign internal[I].valid = in.valid && addr_matches[I] ? 1'b1 : 1'b0;
 
     ShiftRegister #(.WIDTH(AXI_ADDR_BITS + AXIL_DATA_BITS + 1), .LEVELS(REG_LEVELS)) inst_shift_reg (
-        .i_clk(clk),
-        .i_rst_n(reset_synced),
+        .clk(clk),
+        .rst_n(reset_synced),
 
         .i_data({internal[I].addr, internal[I].data, internal[I].valid}),
         .o_data({     out[I].addr,      out[I].data,      out[I].valid})

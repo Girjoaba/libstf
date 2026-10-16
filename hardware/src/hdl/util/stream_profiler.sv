@@ -148,8 +148,8 @@ assign counters_reg = '{
 };
 
 ShiftRegister #(.WIDTH($bits(stream_profile_t)), .LEVELS(OUT_REG_LEVELS)) inst_counters_sr (
-    .i_clk(clk),
-    .i_rst_n(rst_n),
+    .clk(clk),
+    .rst_n(rst_n),
 
     .i_data(counters_reg),
     .o_data(profile.counters)
