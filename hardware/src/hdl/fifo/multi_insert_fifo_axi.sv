@@ -46,8 +46,15 @@ MultiInsertFIFO #(DEPTH, FIFO_WIDTH, FACTOR) inst_fifo (
 
 always_ff @(posedge clk) begin // Remove data beats with keep 0
     if (rst_n == 0) begin
+        axis_reg.tdata  <= 'X;
+        axis_reg.tkeep  <= 'X;
+        axis_reg.tlast  <= 'X;
         axis_reg.tvalid <= 0;
-        o_data.tvalid   <= 0;
+
+        o_data.tdata  <= 'X;
+        o_data.tkeep  <= 'X;
+        o_data.tlast  <= 'X;
+        o_data.tvalid <= 0;
     end else begin
         if (o_data.tready) begin
             o_data.tvalid <= 0;

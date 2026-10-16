@@ -143,6 +143,7 @@ assign shift_valid[0] = in.valid;
 
 always_ff @(posedge clk) begin
     if(!rst_n) begin
+        shift_data[DEPTH:1]  <= 'X;
         shift_valid[DEPTH:1] <= '0;
     end else begin
         for (int i = 1; i < DEPTH + 1; i++) begin

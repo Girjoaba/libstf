@@ -311,7 +311,14 @@ end
 // -- State machine --------------------------------------------------------------------------------
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
-        num_completions <= '0;
+        bytes_written_to_buffer   <= 'X;
+        beats_written_to_transfer <= 'X;
+        num_requests              <= 'X;
+        num_completions           <= '0;
+
+        vaddr        <= 'X;
+        buffer_vaddr <= 'X;
+        capacity     <= 'X;
 
         output_state <= RESET;
     end else begin

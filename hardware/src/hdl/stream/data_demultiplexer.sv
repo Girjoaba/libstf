@@ -28,6 +28,7 @@ logic was_last_data_beat;
 
 always_ff @(posedge clk) begin
     if (rst_n == 1'b0) begin
+        select_reg       <= 'X;
         select_reg_valid <= 1'b0;
     end else begin
         if (select.valid) begin

@@ -166,6 +166,10 @@ end
 
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
+        vaddr       <= 'X;
+        remaining   <= 'X;
+        buffer_last <= 'X;
+
         request_state <= WAIT_FOR_BUFFER;
     end else begin
         case (request_state)

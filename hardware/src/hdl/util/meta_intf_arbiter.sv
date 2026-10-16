@@ -65,6 +65,7 @@ logic [N_INTERFACES - 1 : 0] n_buf_valid;
 
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
+        data_buf  <= 'X;
         buf_valid <= '0;
     end else begin
         data_buf  <= n_data_buf;
@@ -123,6 +124,7 @@ logic[N_BITS - 1 : 0] n_input_stream_rr_next;
 
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
+        intf_out.data        <= 'X;
         intf_out.valid       <= 1'b0;
         input_stream_rr_next <= '0;
     end else begin

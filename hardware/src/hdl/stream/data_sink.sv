@@ -33,6 +33,7 @@ ndata_i #(data_t, NUM_ELEMENTS) internal(clk, rst_n);
 
 always_ff @(posedge clk) begin
     if (rst_n == 1'b0) begin
+        enable_sink       <= 'X;
         enable_sink_valid <= 1'b0;
     end else begin
         if (enable.ready && enable.valid) begin

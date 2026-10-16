@@ -48,6 +48,7 @@ assign i_ready = can_load_padded[stream_select];
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
         for (int s = 0; s < N_STREAMS; s++) begin
+            o_data[s]  <= 'X;
             o_valid[s] <= 1'b0;
         end
     end else begin

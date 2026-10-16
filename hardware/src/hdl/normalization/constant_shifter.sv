@@ -38,7 +38,12 @@ end
 generate if (REGISTER == 1) begin
     always_ff @(posedge clk) begin
         if (!rst_n == 1'b1) begin
+            out.data  <= 'X;
+            out.keep  <= 'X;
+            out.last  <= 'X;
             out.valid <= 1'b0;
+
+            offset_out <= 'X;
         end else begin
             if (!out.valid || out.ready) begin
                 out.data  <= data_shifted;

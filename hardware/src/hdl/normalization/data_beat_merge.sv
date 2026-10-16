@@ -27,8 +27,15 @@ logic[NUM_ELEMENTS - 1:0] register_and_shifted_keep, register_or_shifted_keep;
 
 always_ff @(posedge clk) begin
     if (!rst_n) begin
+        out.data  <= 'X;
+        out.keep  <= 'X;
+        out.last  <= 'X;
+        out.valid <= 0;
+
+        register.data  <= 'X;
+        register.keep  <= 'X;
+        register.last  <= 'X;
         register.valid <= 0;
-        out.valid      <= 0;
     end else begin
         if (!out.valid || out.ready) begin // TODO Add to condition: new data does not overflow register (but then out needs to be handled differently too)
             for (int i = 0; i < NUM_ELEMENTS; i++) begin

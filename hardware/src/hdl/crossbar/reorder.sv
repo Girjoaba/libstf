@@ -52,6 +52,9 @@ always_ff @(posedge clk) begin
         next      <= 0;
         ram_valid <= '0;
 
+        out.data  <= 'X;
+        out.keep  <= 'X;
+        out.last  <= 'X;
         out.valid <= 1'b0;
     end else begin
         next      <= n_next;

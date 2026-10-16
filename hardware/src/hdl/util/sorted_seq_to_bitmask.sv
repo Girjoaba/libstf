@@ -68,6 +68,9 @@ always_ff @(posedge clk) begin
         processed  <= '0;
         mask       <= '0;
         
+        out.data  <= 'X;
+        out.last  <= 'X;
+        out.keep  <= 'X;
         out.valid <= 1'b0;
     end else begin
         current_id <= n_current_id;

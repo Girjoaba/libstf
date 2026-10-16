@@ -28,6 +28,7 @@ assign conf.resp_data  = value;
 always_ff @(posedge clk) begin
     if (!rst_n) begin
         state           <= WAIT;
+        conf.resp_error <= 'X;
         conf.resp_valid <= 1'b0;
     end else begin
         if (state == WAIT) begin

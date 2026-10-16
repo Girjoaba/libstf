@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+`include "libstf_macros.svh"
+
 module DictionaryBank #(
     parameter type value_t,
     parameter type id_t
@@ -12,6 +14,8 @@ module DictionaryBank #(
 
     data_i.m out // #(serial_value_t)
 );
+
+`RESET_RESYNC // Reset pipelining
 
 typedef enum integer {WRITE, READ, FLUSH} state_t;
 
@@ -43,10 +47,14 @@ ReadyRAM #(
 );
 
 always_ff @(posedge clk) begin
-    if(!rst_n) begin
+    if(!reset_synced) begin
         state      <= WRITE;
         write_addr <= '0;
-        out.valid  <= 1'b0;
+
+        out.data.serial <= 'X;
+        out.keep        <= 'X;
+        out.last        <= 'X;
+        out.valid       <= 1'b0;
     end else begin
         case (state)
         WRITE: begin

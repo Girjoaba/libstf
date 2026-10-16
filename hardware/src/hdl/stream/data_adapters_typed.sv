@@ -67,6 +67,9 @@ always_ff @(posedge clk) begin
     if (rst_n == 1'b0) begin
         is_upper <= 1'b0;
 
+        data  <= 'X;
+        keep  <= 'X;
+        last  <= 'X;
         valid <= 1'b0;
     end else begin
         is_upper <= n_is_upper;
@@ -208,11 +211,12 @@ module NDataToTypedNData #(
 valid_i #(type_t) keep_type(clk, rst_n);
 always_ff @(posedge clk) begin
     if (rst_n == 1'b0) begin
+        keep_type.data  <= 'X;
         keep_type.valid <= 0;
     end else begin
         if (in_type.ready && in_type.valid) begin
-            keep_type.valid <= 1;
             keep_type.data <= in_type.data;
+            keep_type.valid <= 1;
         end
 
         if (out.ready && out.valid && out.last) begin

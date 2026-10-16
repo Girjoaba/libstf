@@ -14,7 +14,10 @@ ready_valid_i #(data_t) tmp(clk, rst_n), over(clk, rst_n);
 
 always_ff @(posedge clk) begin
     if (!rst_n) begin
-        tmp.valid  <= 1'b0;
+        tmp.data  <= 'X;
+        tmp.valid <= 1'b0;
+
+        over.data  <= 'X;
         over.valid <= 1'b0;
     end else begin
         if (in.ready) begin
@@ -33,7 +36,7 @@ always_ff @(posedge clk) begin
         if(out.ready) begin
             over.valid <= 1'b0;
         end
-    end     
+    end
 end
 
 // Assign ready to silence assertion that ready cannot be undefined. Needs to be high so we do not 

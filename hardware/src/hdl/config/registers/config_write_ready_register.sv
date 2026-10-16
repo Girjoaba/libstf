@@ -17,6 +17,7 @@ module ConfigWriteReadyRegister #(
 
 always_ff @(posedge clk) begin
     if (!rst_n) begin
+        data.data  <= 'X;
         data.valid <= 1'b0;
     end else begin
         if (write_config.valid && write_config.addr == ADDR) begin

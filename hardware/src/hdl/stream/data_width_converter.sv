@@ -45,6 +45,9 @@ end else if (IN_WIDTH < OUT_WIDTH) begin
     always_ff @(posedge clk) begin
         if (!rst_n) begin
             slot_idx <= '0;
+            data     <= 'X;
+            keep     <= 'X;
+            last     <= 'X;
             valid    <= 1'b0;
         end else begin
             slot_idx <= n_slot_idx;
@@ -127,6 +130,9 @@ end else begin // OUT_WIDTH < IN_WIDTH
         if (!rst_n) begin
             slot_idx <= '0;
             valid    <= 1'b0;
+            data     <= 'X;
+            keep     <= 'X;
+            last     <= 'X;
         end else if (can_load) begin
             slot_idx <= '0;
             valid    <= in.valid;

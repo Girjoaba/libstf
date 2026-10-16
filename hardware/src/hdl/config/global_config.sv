@@ -81,6 +81,8 @@ write_config_i pre_write_splitter_config(.clk(clk), .rst_n(reset_synced));
 
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
+        pre_write_splitter_config.data  <= 'X;
+        pre_write_splitter_config.addr  <= 'X;
         pre_write_splitter_config.valid <= 1'b0;
     end else begin
         if (axi_ctrl.awvalid && axi_ctrl.wvalid) begin // Address and data valid
@@ -136,6 +138,7 @@ read_config_i internal_read_configs[NUM_CONFIGS + 1](.clk(clk), .rst_n(reset_syn
 
 always_ff @(posedge clk) begin
     if(reset_synced == 1'b0) begin
+        pre_read_splitter_config.read_addr  <= 'X;
         pre_read_splitter_config.read_valid <= 1'b0;
     end else begin
         if (pre_read_splitter_config.read_ready) begin

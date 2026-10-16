@@ -26,6 +26,7 @@ valid_i #(type_t) typ(clk, rst_n);
 
 always_ff @(posedge clk) begin
     if (rst_n == 1'b0) begin
+        typ.data  <= 'X;
         typ.valid <= 0;
     end else if (in_values.ready && in_values.valid) begin
         typ.data <= in_values.typ;

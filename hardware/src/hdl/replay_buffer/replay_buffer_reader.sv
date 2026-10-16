@@ -255,10 +255,35 @@ else $fatal(1, "A stream that is read multiple times does not fit into the ring 
 // -- State machine --------------------------------------------------------------------------------
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
-        tail_valid         <= 1'b0;
+        tail        <= 'X;
+        tail_valid  <= 1'b0;
+        tail_end    <= 'X;
+        tail_closed <= 'X;
+
         num_extents        <= '0;
         num_closed_streams <= '0;
-        read_valid         <= 1'b0;
+
+        remaining_reads <= 'X;
+        head_read       <= 'X;
+        head_read_max   <= 'X;
+        num_segments    <= 'X;
+        wrapped         <= 'X;
+
+        read_valid <= 1'b0;
+        read_vaddr <= 'X;
+        read_size  <= 'X;
+        read_last  <= 'X;
+
+        read_release <= 'X;
+
+        seg_vaddr   <= '{default: 'X};
+        seg_size    <= '{default: 'X};
+        seg_end     <= '{default: 'X};
+        stream_span <= 'X;
+
+        replay_seg <= 'X;
+
+        ring_end <= 'X;
 
         state <= WAIT_FOR_STREAM;
     end else begin

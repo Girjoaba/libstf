@@ -58,6 +58,9 @@ end else if (IN_WIDTH == 256 && OUT_WIDTH == 512) begin // Upsize // TODO: This 
     always_ff @(posedge clk) begin
         if (rst_n == 1'b0) begin
             is_upper <= 1'b0;
+
+            reg_data <= 'X;
+            reg_keep <= 'X;
         end else begin
             if (in.tvalid && in.tready) begin
                 if (!in.tlast) begin

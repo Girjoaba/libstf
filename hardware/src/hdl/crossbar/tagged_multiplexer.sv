@@ -134,7 +134,11 @@ end
 // -- Output logic ---------------------------------------------------------------------------------
 always_ff @(posedge clk) begin
     if (!reset_synced) begin
-        last_seen     <= '0;
+        last_seen <= '0;
+
+        mux_out.data  <= 'X;
+        mux_out.keep  <= 'X;
+        mux_out.last  <= 'X;
         mux_out.valid <= '0;
     end else begin
         last_seen <= n_last_seen;

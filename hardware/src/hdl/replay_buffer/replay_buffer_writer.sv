@@ -155,8 +155,14 @@ end
 // -- State machine --------------------------------------------------------------------------------
 always_ff @(posedge clk) begin
     if (reset_synced == 1'b0) begin
-        configured        <= 1'b0;
+        configured <= 1'b0;
+        ring_base  <= 'X;
+        ring_size  <= 'X;
+        ring_end   <= 'X;
+
+        transfer_vaddr    <= 'X;
         next_stages_valid <= '0;
+        free_bytes        <= 'X;
 
         state <= ALLOCATE;
     end else begin

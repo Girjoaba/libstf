@@ -30,6 +30,9 @@ always_ff @(posedge clk) begin
         data.keep  <= 'X;
         data.last  <= 'X;
         data.valid <= 1'b0;
+
+        mask.duplicates <= 'X;
+        mask.origins    <= 'X;
     end else begin
         data.data  <= n_data.data;
         data.keep  <= n_data.keep;

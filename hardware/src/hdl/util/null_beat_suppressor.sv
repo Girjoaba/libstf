@@ -24,6 +24,9 @@ assign is_last_or_not_null = in.keep != '0 || in.last;
 
 always_ff @(posedge clk) begin
     if (!rst_n) begin
+        hold_data  <= 'X;
+        hold_keep  <= 'X;
+        hold_last  <= 'X;
         hold_valid <= 1'b0;
     end else begin
         hold_data  <= n_hold_data;
