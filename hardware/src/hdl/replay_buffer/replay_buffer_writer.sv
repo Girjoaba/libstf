@@ -113,6 +113,7 @@ assign mem_config.buffer_valid = state == ALLOCATE && configured && next_stages_
 // leaves its flush state once buffer_valid is low, which it is for two cycles because the
 // configuration clears next_stages_valid.
 assign mem_config.flush_buffers = buffer_config.valid;
+assign mem_config.empty_stream_consumes_buffer = 1'b0;
 
 assign next_granted = mem_config.buffer_valid && mem_config.buffer_ready;
 
