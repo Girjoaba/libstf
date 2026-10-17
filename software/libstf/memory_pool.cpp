@@ -239,8 +239,9 @@ Status HugePageMemoryPool::allocate(size_t size, size_t alignment, void **out) {
         }
         total_bytes_allocated_ += size;
         bytes_allocated_ += size;
+        // Zero size allocations are not counted because free does not count them either
+        num_allocs_ += 1;
     }
-    num_allocs_ += 1;
 
     return Status::OK();
 }
@@ -262,20 +263,24 @@ Status HugePageMemoryPool::reallocate(size_t old_size, size_t new_size, size_t a
     // Ensure the alignment is a power of two. See: https://stackoverflow.com/a/108360/5589776
     assert((alignment & (alignment - 1)) == 0);
     auto tc = get_tcache_id_for_calling_thread();
-    // Normal Re-allocation with jemalloc (which cannot handle size = 0)
-    *ptr = je_rallocx(*ptr, new_size,
-                      MALLOCX_ALIGN(alignment) | MALLOCX_ARENA(arena_index) | MALLOCX_TCACHE(tc));
+    // Normal Re-allocation with jemalloc (which cannot handle size = 0). On failure, the old
+    // allocation stays valid, so we must not overwrite *ptr.
+    auto new_ptr = je_rallocx(*ptr, new_size,
+                              MALLOCX_ALIGN(alignment) | MALLOCX_ARENA(arena_index) |
+                                  MALLOCX_TCACHE(tc));
 
-    if (*ptr == nullptr) {
+    if (new_ptr == nullptr) {
         return Status(StatusCode::OutOfMemory,
                       "HugePageMemoryPool could not Reallocate as requested!");
     }
+    *ptr = new_ptr;
 
-    auto n_new_bytes = (new_size - old_size);
-    if (n_new_bytes >= 0) {
-        total_bytes_allocated_ += n_new_bytes;
+    if (new_size > old_size) {
+        total_bytes_allocated_ += new_size - old_size;
+        bytes_allocated_ += new_size - old_size;
+    } else {
+        bytes_allocated_ -= old_size - new_size;
     }
-    bytes_allocated_ += n_new_bytes;
 
     return Status::OK();
 }
@@ -398,23 +403,24 @@ SimpleMemoryPool::~SimpleMemoryPool() {
 }
 
 Status SimpleMemoryPool::allocate(size_t size, size_t alignment, void **out) {
+    std::lock_guard<std::recursive_mutex> lock(allocated_buffers_mutex);
+
+    // Zero size allocations are not tracked because free(nullptr) does not untrack them
     if (size == 0) {
         *out = nullptr;
-    } else {
-        // Ensure the alignment is a power of two. See: https://stackoverflow.com/a/108360/5589776
-        assert((alignment & (alignment - 1)) == 0);
-        if (!linear_allocator_.allocate(size, alignment, out)) {
-            return Status(StatusCode::OutOfMemory, "Unable to allocate memory!");
-        }
-
-        total_bytes_allocated_ += size;
-        bytes_allocated_ += size;
+        return Status::OK();
     }
 
-    {
-        std::lock_guard<std::recursive_mutex> lock(allocated_buffers_mutex);
-        allocated_buffers.emplace(*out, size);
+    // Ensure the alignment is a power of two. See: https://stackoverflow.com/a/108360/5589776
+    assert((alignment & (alignment - 1)) == 0);
+    if (!linear_allocator_.allocate(size, alignment, out)) {
+        return Status(StatusCode::OutOfMemory, "Unable to allocate memory!");
     }
+
+    total_bytes_allocated_ += size;
+    bytes_allocated_ += size;
+
+    allocated_buffers.emplace(*out, size);
     num_allocs_++;
 
     return Status::OK();
@@ -422,28 +428,36 @@ Status SimpleMemoryPool::allocate(size_t size, size_t alignment, void **out) {
 
 Status SimpleMemoryPool::reallocate(size_t old_size, size_t new_size, size_t alignment,
                                     void **ptr) {
+    std::lock_guard<std::recursive_mutex> lock(allocated_buffers_mutex);
+
     if (new_size == 0) {
         free(*ptr, old_size, alignment);
         *ptr = nullptr;
         return Status::OK();
     }
+    if (*ptr == nullptr) {
+        assert(old_size == 0);
+        return allocate(new_size, alignment, ptr);
+    }
 
+    // Ensure the alignment is a power of two. See: https://stackoverflow.com/a/108360/5589776
+    assert((alignment & (alignment - 1)) == 0);
     void *new_ptr = nullptr;
-    auto  status  = allocate(new_size, alignment, &new_ptr);
-    if (!status.ok()) {
-        return status;
+    if (!linear_allocator_.allocate(new_size, alignment, &new_ptr)) {
+        return Status(StatusCode::OutOfMemory, "Unable to reallocate memory!");
     }
 
-    if (*ptr) {
-        std::memcpy(new_ptr, *ptr, std::min(old_size, new_size));
-        free(*ptr, old_size, alignment);
-    }
+    std::memcpy(new_ptr, *ptr, std::min(old_size, new_size));
+    linear_allocator_.free(*ptr);
+    allocated_buffers.erase(*ptr);
+    allocated_buffers.emplace(new_ptr, new_size);
 
-    auto n_new_bytes = (new_size - old_size);
-    if (n_new_bytes >= 0) {
-        total_bytes_allocated_ += n_new_bytes;
+    if (new_size > old_size) {
+        total_bytes_allocated_ += new_size - old_size;
+        bytes_allocated_ += new_size - old_size;
+    } else {
+        bytes_allocated_ -= old_size - new_size;
     }
-    bytes_allocated_ += n_new_bytes;
 
     *ptr = new_ptr;
     return Status::OK();
@@ -451,11 +465,10 @@ Status SimpleMemoryPool::reallocate(size_t old_size, size_t new_size, size_t ali
 
 void SimpleMemoryPool::free(void *ptr, size_t size, size_t alignment) {
     if (ptr) {
+        std::lock_guard<std::recursive_mutex> lock(allocated_buffers_mutex);
         bytes_allocated_ -= size;
         num_allocs_ -= 1;
         linear_allocator_.free(ptr);
-
-        std::lock_guard<std::recursive_mutex> lock(allocated_buffers_mutex);
         allocated_buffers.erase(ptr);
     }
 }

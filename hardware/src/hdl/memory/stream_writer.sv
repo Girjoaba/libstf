@@ -407,8 +407,9 @@ always_comb begin
                     pending_in_valid = 1'b1;
 
                     // If no bytes were written, we can just reuse the current buffer for the next 
-                    // stream. Otherwise, we fetch the next buffer.
-                    if (bytes_written_to_buffer != 0) begin
+                    // stream (unless an empty stream consumes its buffer). Otherwise, we fetch the 
+                    // next buffer.
+                    if (bytes_written_to_buffer != 0 || mem_config.empty_stream_consumes_buffer) begin
                         n_output_state = WAIT_FOR_BUFFER;
                     end
                 end
