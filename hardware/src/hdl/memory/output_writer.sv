@@ -93,11 +93,20 @@ end
 assign notify_count = notify_count_reg;
 
 // -- FPGA-initiated transfers ---------------------------------------------------------------------
+localparam integer NUM_SKID_STAGES = 2;
+
 for(genvar I = 0; I < N_STRM_AXI; I++) begin : gen_stream_writers
 `ifndef DISABLE_OUTPUT_WRITER
     stream_writer_notify_i stream_notify (.clk(clk), .rst_n(reset_synced));
     stream_writer_notify_i stream_issued (.clk(clk), .rst_n(reset_synced));
     always_comb stream_issued.tie_off_s(); // Unused
+
+    metaIntf #(.STYPE(req_t))     sq_wr_writer (.aclk(clk), .aresetn(reset_synced));
+    metaIntf #(.STYPE(irq_not_t)) notify_writer(.aclk(clk), .aresetn(reset_synced));
+
+    AXI4SR writer_out    (.aclk(clk), .aresetn(reset_synced));
+    AXI4S  writer_out_s  (.aclk(clk), .aresetn(reset_synced));
+    AXI4S  data_out_s    (.aclk(clk), .aresetn(reset_synced));
 
     // Invoke the FPGA-initiated transfers for this stream
     StreamWriter #(
@@ -107,7 +116,7 @@ for(genvar I = 0; I < N_STRM_AXI; I++) begin : gen_stream_writers
         .clk(clk),
         .rst_n(reset_synced),
 
-        .sq_wr(sq_wr_strm[I]),
+        .sq_wr(sq_wr_writer),
         .cq_wr(cq_wr_strm[I]),
         .notify(stream_notify),
         .issued(stream_issued),
@@ -115,15 +124,51 @@ for(genvar I = 0; I < N_STRM_AXI; I++) begin : gen_stream_writers
         .mem_config(mem_config[I]),
 
         .input_data(data_in[I]),
-        .output_data(data_out[I])
+        .output_data(writer_out)
+    );
+
+    MetaIntfSkidBuffer #(
+        .STYPE(req_t),
+        .NUM_STAGES(NUM_SKID_STAGES)
+    ) inst_sq_wr_skid (
+        .clk(clk),
+        .rst_n(reset_synced),
+
+        .in(sq_wr_writer),
+        .out(sq_wr_strm[I])
     );
 
     NotifyMetaIntfAdapter #(
         .AXI_STRM_ID(I)
     ) inst_notify_adapter (
         .in(stream_notify),
+        .out(notify_writer)
+    );
+
+    MetaIntfSkidBuffer #(
+        .STYPE(irq_not_t),
+        .NUM_STAGES(NUM_SKID_STAGES)
+    ) inst_notify_skid (
+        .clk(clk),
+        .rst_n(reset_synced),
+
+        .in(notify_writer),
         .out(notify_strm[I])
     );
+
+    // The StreamWriter always sends with tid 0
+    `AXIS_ASSIGN(writer_out, writer_out_s)
+
+    AXISkidBuffer inst_data_out_skid (
+        .clk(clk),
+        .rst_n(reset_synced),
+
+        .in(writer_out_s),
+        .out(data_out_s)
+    );
+
+    `AXIS_ASSIGN(data_out_s, data_out[I])
+    assign data_out[I].tid = '0;
 `else
     // Tie of the interfaces we don't need
     always_comb sq_wr_strm [I].tie_off_m();

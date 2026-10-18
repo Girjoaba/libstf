@@ -10,44 +10,45 @@ module SkidBuffer #(
     ready_valid_i.m out // #(data_t) 
 );
 
-ready_valid_i #(data_t) tmp(clk, rst_n), over(clk, rst_n);
+ready_valid_i #(data_t) head(clk, rst_n);
+
+// The enables of the head and skid data are replicated because they reach every data bit
+data_t                skid_data;
+(* max_fanout = 64 *) logic skid_valid;
+(* max_fanout = 64 *) logic head_load;
+
+assign head_load = !head.valid || out.ready;
 
 always_ff @(posedge clk) begin
     if (!rst_n) begin
-        tmp.data  <= 'X;
-        tmp.valid <= 1'b0;
+        head.data  <= 'X;
+        head.valid <= 1'b0;
 
-        over.data  <= 'X;
-        over.valid <= 1'b0;
+        skid_data  <= 'X;
+        skid_valid <= 1'b0;
     end else begin
+        if (head_load) begin
+            head.data  <= skid_valid ? skid_data : in.data;
+            head.valid <= skid_valid || in.valid;
+        end
+
         if (in.ready) begin
-            tmp.data  <= in.data;
-            tmp.valid <= in.valid;
-        end
-
-        if (!over.valid) begin
-            over.data <= tmp.data;
-
-            if(~out.ready) begin
-                over.valid <= tmp.valid;
-            end
-        end
-
-        if(out.ready) begin
-            over.valid <= 1'b0;
+            skid_data  <= in.data;
+            skid_valid <= in.valid && head.valid && !out.ready;
+        end else if (out.ready) begin
+            skid_valid <= 1'b0;
         end
     end
 end
 
 // Assign ready to silence assertion that ready cannot be undefined. Needs to be high so we do not 
 // get in trouble with with stable assertion of the interface.
-assign tmp.ready  = 1'b1;
-assign over.ready = 1'b1;
+assign head.ready = 1'b1;
 
-assign in.ready = !tmp.valid || !over.valid;
+assign in.ready = !skid_valid;
 
-assign out.data  = over.valid ? over.data : tmp.data;
-assign out.valid = tmp.valid || over.valid;
+assign out.data  = head.data;
+assign out.valid = head.valid;
 
 endmodule
 
@@ -315,5 +316,40 @@ assign out.keep       = skid_out.data.keep;
 assign out.last       = skid_out.data.last;
 assign out.valid      = skid_out.valid;
 assign skid_out.ready = out.ready;
+
+endmodule
+
+module MetaIntfSkidBuffer #(
+    parameter type STYPE = logic[63:0],
+    parameter NUM_STAGES = 1
+) (
+    input logic clk,
+    input logic rst_n,
+
+    metaIntf.s in, // #(STYPE)
+    metaIntf.m out // #(STYPE)
+);
+
+ready_valid_i #(STYPE) stages[NUM_STAGES + 1](clk, rst_n);
+
+assign stages[0].data  = in.data;
+assign stages[0].valid = in.valid;
+assign in.ready        = stages[0].ready;
+
+for (genvar I = 0; I < NUM_STAGES; I++) begin
+    SkidBuffer #(
+        .data_t(STYPE)
+    ) inst_skid_buffer (
+        .clk(clk),
+        .rst_n(rst_n),
+
+        .in(stages[I]),
+        .out(stages[I + 1])
+    );
+end
+
+assign out.data                = stages[NUM_STAGES].data;
+assign out.valid               = stages[NUM_STAGES].valid;
+assign stages[NUM_STAGES].ready = out.ready;
 
 endmodule

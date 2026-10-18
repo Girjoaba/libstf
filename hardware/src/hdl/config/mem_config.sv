@@ -56,11 +56,19 @@ ConfigReadRegisterFile #(
 // -- Write ----------------------------------------------------------------------------------------
 ready_valid_i #(logic) flush_buffers(clk, reset_synced);
 for (genvar I = 0; I < NUM_STREAMS; I++) begin
-    ready_valid_i #(buffer_t) buffer(clk, reset_synced);
+    ready_valid_i #(buffer_t) buffer(clk, reset_synced), buffer_out(clk, reset_synced);
 
     ConfigWriteFIFO #(I, MAXIMUM_NUM_ENQUEUED_BUFFERS, buffer_t) inst_buffer_fifo (clk, reset_synced, write_config, buffer);
 
-    `CONFIG_INTF_TO_SIGNALS(buffer, out[I].buffer)
+    SkidBuffer #(buffer_t) inst_buffer_skid_buffer (
+        .clk(clk),
+        .rst_n(reset_synced),
+
+        .in(buffer),
+        .out(buffer_out)
+    );
+
+    `CONFIG_INTF_TO_SIGNALS(buffer_out, out[I].buffer)
 
     assign out[I].flush_buffers                = flush_buffers.valid;
     assign out[I].empty_stream_consumes_buffer = EMPTY_STREAM_CONSUMES_BUFFER;
