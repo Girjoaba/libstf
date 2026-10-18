@@ -10,7 +10,9 @@ module TypedDictionary
     localparam type typed_dictionary_data_t = data32_t,
     localparam int TYPED_DICTIONARY_DATA_SIZE = $bits(typed_dictionary_data_t) / 8,
     parameter NUM_ELEMENTS = DATABEAT_SIZE / TYPED_DICTIONARY_DATA_SIZE,
-    parameter NUM_BANKS = 16
+    parameter NUM_BANKS = 16,
+    // Number of 32 bit values the dictionary can hold (a 64 bit value takes two entries)
+    parameter longint NUM_VALUES = longint'(2) ** $bits(id_t)
 ) (
     input logic clk,
     input logic rst_n,
@@ -170,7 +172,8 @@ Dictionary #(
     .value_t(data32_t),
     .id_t(id_t),
     .NUM_ELEMENTS(NUM_ELEMENTS),
-    .NUM_BANKS(NUM_BANKS)
+    .NUM_BANKS(NUM_BANKS),
+    .NUM_VALUES(NUM_VALUES)
 ) inst_dictionary (
     .clk(clk),
     .rst_n(rst_n),

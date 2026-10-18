@@ -17,7 +17,10 @@
  *
  * Parameters:
  *   DATA_WIDTH        - Width of a stored word in bits.
- *   ADDR_WIDTH        - Width of the address, giving 2**ADDR_WIDTH words.
+ *   ADDR_WIDTH        - Width of the address.
+ *   DEPTH             - Number of words, at most 2**ADDR_WIDTH (the default). Only addresses below
+ *                       DEPTH are valid. This can be used for non-power of two sized RAMs. The RAM
+ *                       is the instead sized to power of underlying hardware component.
  *   STYLE             - Target cell, "block" (BRAM) or "ultra" (URAM).
  *   READ_AFTER_WRITE  - Forward a write seen one cycle before a same-address read.
  *   READ_DURING_WRITE - Forward a write seen in the same cycle as a same-address read.
@@ -31,6 +34,7 @@
 module RAM #(
     parameter DATA_WIDTH,
     parameter ADDR_WIDTH,
+    parameter DEPTH = 2 ** ADDR_WIDTH,
     parameter STYLE = "block", // block or ultra
     parameter READ_AFTER_WRITE = 0,
     parameter READ_DURING_WRITE = 0,
@@ -47,6 +51,7 @@ module RAM #(
 );
 
 `ASSERT_ELAB(STYLE == "block" || STYLE == "ultra")
+`ASSERT_ELAB(DEPTH > 0 && DEPTH <= 2 ** ADDR_WIDTH)
 
 localparam LINE_WIDTH = STYLE == "ultra" ? 72 : 36;
 localparam CELL_DEPTH = STYLE == "ultra" ? 4096 : 1024;
@@ -54,7 +59,7 @@ localparam CELL_DEPTH = STYLE == "ultra" ? 4096 : 1024;
 // Packing only pays off when more than one word fits in a line AND the RAM is
 // deep enough to span more than a single cell. If it fits in one cell the cell
 // is already fully allocated, so packing would only add slot-select logic.
-localparam DEEPER_THAN_CELL = (2 ** ADDR_WIDTH) > CELL_DEPTH;
+localparam DEEPER_THAN_CELL = DEPTH > CELL_DEPTH;
 
 // Number of words packed per line, clamped to a power of two so the slot index
 // is a clean slice of the address. Packing is skipped when only one word fits.
@@ -62,6 +67,7 @@ localparam WORDS_PER_LINE  = !PACK || !DEEPER_THAN_CELL || LINE_WIDTH < DATA_WID
 localparam SLOT_BITS       = $clog2(WORDS_PER_LINE);
 localparam LINE_ADDR_WIDTH = ADDR_WIDTH - SLOT_BITS;
 localparam LINE_DATA_WIDTH = WORDS_PER_LINE * DATA_WIDTH;
+localparam NUM_LINES       = (DEPTH + WORDS_PER_LINE - 1) / WORDS_PER_LINE;
 
 // Packing must leave at least one address bit for the line index.
 `ASSERT_ELAB(ADDR_WIDTH > SLOT_BITS)
@@ -81,7 +87,7 @@ function automatic slot_t slot_of(addr_t a);
     slot_of = SLOT_BITS == 0 ? 0 : slot_t'(a[SLOT_BITS - 1:0]);
 endfunction
 
-(* ram_style = STYLE *) line_t ram[2 ** LINE_ADDR_WIDTH];
+(* ram_style = STYLE *) line_t ram[NUM_LINES];
 
 addr_t[1:0] ram_write_addr;
 data_t[1:0] ram_write_data;
@@ -118,6 +124,11 @@ always_ff @(posedge clk) begin
     ram_read_line <= ram[line_of(read_addr)];
 end
 
+`ifndef SYNTHESIS
+assert property (@(posedge clk) write_enable !== 1'b1 || write_addr < DEPTH)
+else $fatal(1, "RAM write to address %0d beyond the depth %0d", write_addr, DEPTH);
+`endif
+
 always_comb begin
     if (READ_DURING_WRITE && ram_write_enable[0] && ram_write_addr[0] == ram_read_addr) begin
         read_data = ram_write_data[0];
@@ -133,6 +144,7 @@ endmodule
 module ReadyRAM #(
     parameter DATA_WIDTH,
     parameter ADDR_WIDTH,
+    parameter DEPTH = 2 ** ADDR_WIDTH,
     parameter STYLE = "block", // block or ultra
     parameter READ_AFTER_WRITE = 0,
     parameter READ_DURING_WRITE = 0,
@@ -157,6 +169,7 @@ logic[DATA_WIDTH - 1:0] stalled_data;
 RAM #(
     .DATA_WIDTH(DATA_WIDTH),
     .ADDR_WIDTH(ADDR_WIDTH),
+    .DEPTH(DEPTH),
     .STYLE(STYLE),
     .READ_AFTER_WRITE(READ_AFTER_WRITE),
     .READ_DURING_WRITE(READ_DURING_WRITE),

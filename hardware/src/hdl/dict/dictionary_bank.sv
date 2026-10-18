@@ -4,7 +4,8 @@
 
 module DictionaryBank #(
     parameter type value_t,
-    parameter type id_t
+    parameter type id_t,
+    parameter DEPTH = 2 ** $bits(id_t) // Number of values, ids from 0 to DEPTH - 1
 ) (
     input logic clk,
     input logic rst_n,
@@ -32,6 +33,7 @@ assign write_enable = state == WRITE ? in_value.valid : 1'b0;
 ReadyRAM #(
     .DATA_WIDTH($bits(value_t)),
     .ADDR_WIDTH($bits(id_t)),
+    .DEPTH(DEPTH),
     .STYLE("ultra"),
     .PACK(1)
 ) inst_value_uram (
@@ -45,6 +47,14 @@ ReadyRAM #(
     .read_data(out.data.value),
     .read_ready(out.ready)
 );
+
+`ifndef SYNTHESIS
+assert property (@(posedge clk) disable iff (!reset_synced) !(state == WRITE && in_value.valid) || write_addr < DEPTH)
+else $fatal(1, "DictionaryBank holds at most %0d values", DEPTH);
+
+assert property (@(posedge clk) disable iff (!reset_synced) !(state == READ && in_id.valid && in_id.keep) || in_id.data.id < DEPTH)
+else $fatal(1, "DictionaryBank read of id %0d beyond its %0d values", in_id.data.id, DEPTH);
+`endif
 
 always_ff @(posedge clk) begin
     if(!reset_synced) begin

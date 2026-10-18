@@ -20,7 +20,11 @@ module Dictionary #(
     parameter type value_t,
     parameter type id_t,
     parameter NUM_ELEMENTS,
-    parameter NUM_BANKS = 16
+    parameter NUM_BANKS = 16,
+    // Number of values the dictionary can hold, a multiple of NUM_BANKS. Every bank holds
+    // NUM_VALUES / NUM_BANKS of them, so a bank depth that fills whole RAM cells does not need the
+    // next power of two.
+    parameter longint NUM_VALUES = longint'(2) ** $bits(id_t)
 ) (
     input logic clk,
     input logic rst_n,
@@ -39,6 +43,10 @@ localparam LOG_NUM_ELEMENTS = $clog2(NUM_ELEMENTS);
 localparam LOG_NUM_BANKS = $clog2(NUM_BANKS);
 localparam LOG_MAX_IN_TRANSIT = $clog2(MAX_IN_TRANSIT);
 localparam SERIAL_WIDTH = LOG_MAX_IN_TRANSIT + LOG_NUM_ELEMENTS;
+localparam BANK_DEPTH = NUM_VALUES / NUM_BANKS;
+
+`ASSERT_ELAB(NUM_VALUES % NUM_BANKS == 0)
+`ASSERT_ELAB(NUM_VALUES <= longint'(2) ** ID_BITS)
 
 typedef logic[SERIAL_WIDTH - 1:0]            full_serial_t;
 typedef logic[LOG_MAX_IN_TRANSIT - 1:0]      serial_t;
@@ -192,7 +200,8 @@ Crossbar #(
 for (genvar I = 0; I < NUM_BANKS; I++) begin
     DictionaryBank #(
         .value_t(value_t),
-        .id_t(bank_id_t)
+        .id_t(bank_id_t),
+        .DEPTH(BANK_DEPTH)
     ) inst_bank (
         .clk(clk),
         .rst_n(reset_synced),
