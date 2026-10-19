@@ -4,13 +4,15 @@ from unit_test.fpga_stream import Stream, StreamType, get_bytes_for_stream_type
 from libstf_utils.configured_test_case import ConfiguredTestCase
 from libstf_utils.fpga_configuration import StreamConfig
 
-# Number of 32-bit values per 512-bit input beat
+# Number of 32-bit and 64-bit values per 512-bit input beat
 VALUES_PER_BEAT = 16
+VALUES_64_PER_BEAT = 8
 
 
-def random_values(n: int) -> Stream:
-    # Full 32-bit range, so wrong byte selection shows up in the truncated output
-    return Stream(StreamType.UNSIGNED_INT_32, [random.randint(0, 2**32 - 1) for _ in range(n)])
+def random_values(n: int, stream_type: StreamType = StreamType.UNSIGNED_INT_32) -> Stream:
+    # Full range, so wrong byte selection shows up in the truncated output
+    bits = get_bytes_for_stream_type(stream_type) * 8
+    return Stream(stream_type, [random.randint(0, 2**bits - 1) for _ in range(n)])
 
 
 def cast(values: Stream, out_type: StreamType) -> Stream:
@@ -20,8 +22,8 @@ def cast(values: Stream, out_type: StreamType) -> Stream:
 
 class CastTest(ConfiguredTestCase):
     """
-    These tests test the TypedNDataCast module. The input are 32-bit values, the output type is
-    configured per transfer through the stream configuration.
+    These tests test the TypedNDataCast module. The input and the output type are configured per
+    transfer through the stream configuration.
     """
 
     debug_mode = True
@@ -36,8 +38,9 @@ class CastTest(ConfiguredTestCase):
         assert self.transfers is not None, "Cannot have cast test without transfers!"
 
         stream_config = self.config.get_config(StreamConfig)
-        for (_, out_type) in self.transfers:
+        for (values, out_type) in self.transfers:
             stream_config.enqueue_stream_config(0, out_type)
+            stream_config.enqueue_stream_config(1, values.data_type)
 
         for (values, _) in self.transfers:
             self.set_stream_input(0, values)
@@ -89,4 +92,30 @@ class CastTest(ConfiguredTestCase):
             (random_values(1), StreamType.UNSIGNED_INT_32),
             (random_values(3 * VALUES_PER_BEAT + 3), StreamType.UNSIGNED_INT_8),
             (random_values(VALUES_PER_BEAT + 3), StreamType.UNSIGNED_INT_16),
+        ])
+
+    def test_32bit_from_64bit(self):
+        """
+        Several full output beats followed by a partial one, a transfer ending with a partial
+        input beat in the first half of an output beat and one ending exactly on a full output beat.
+        """
+        self.run_transfers([
+            (random_values(2 * 3 * VALUES_64_PER_BEAT + 5, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_32),
+            (random_values(VALUES_64_PER_BEAT - 3, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_32),
+            (random_values(4 * VALUES_64_PER_BEAT, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_32),
+        ])
+
+    def test_mixed_input_types(self):
+        """
+        Back-to-back transfers switching between 64 bit and 32 bit inputs, with pass-through and
+        narrowing for both, including single-value transfers.
+        """
+        self.run_transfers([
+            (random_values(3 * VALUES_64_PER_BEAT + 1, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_32),
+            (random_values(1, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_64),
+            (random_values(VALUES_PER_BEAT + 3), StreamType.UNSIGNED_INT_16),
+            (random_values(1, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_32),
+            (random_values(2 * VALUES_64_PER_BEAT + 3, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_64),
+            (random_values(VALUES_PER_BEAT - 1), StreamType.UNSIGNED_INT_32),
+            (random_values(5 * VALUES_64_PER_BEAT - 1, StreamType.UNSIGNED_INT_64), StreamType.UNSIGNED_INT_32),
         ])

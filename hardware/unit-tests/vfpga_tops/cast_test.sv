@@ -47,10 +47,10 @@ GlobalConfig #(
     .read_configs(read_configs)
 );
 
-// The stream config holds the output type of each transfer
-stream_config_i stream_config[1](clk, rst_n);
+// The stream config holds the output type (stream 0) and the input type (stream 1) of each transfer
+stream_config_i stream_config[2](clk, rst_n);
 StreamConfig #(
-    .NUM_STREAMS(1)
+    .NUM_STREAMS(2)
 ) inst_stream_config (
     .clk(clk),
     .rst_n(rst_n),
@@ -65,15 +65,14 @@ ready_valid_i #(type_t) out_type(clk, rst_n);
 `CONFIG_SIGNALS_TO_INTF(stream_config[0].data_type, out_type)
 
 assign stream_config[0].select_ready = 1'b1;
+assign stream_config[1].select_ready = 1'b1;
 
 // -- Input ----------------------------------------------------------------------------------------
 AXI4S axi_host_recv(.aclk(clk), .aresetn(rst_n));
 `AXIS_ASSIGN(axis_host_recv[0], axi_host_recv) // AXI4SR to AXI4S
 
-// The input always contains 32 bit values
 ready_valid_i #(type_t) in_type(clk, rst_n);
-assign in_type.data  = INT32_T;
-assign in_type.valid = 1'b1;
+`CONFIG_SIGNALS_TO_INTF(stream_config[1].data_type, in_type)
 
 typed_ndata_i #(DATABEAT_SIZE) in_data(clk, rst_n);
 AXIToTypedNData #(

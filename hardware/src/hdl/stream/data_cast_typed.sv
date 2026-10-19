@@ -9,6 +9,7 @@
  *   - Same width as in.typ (e.g. INT32_T -> INT32_T): pass-through with one register stage.
  *   - 32 bit -> INT16_T: 2 input beats are packed into 1 output beat.
  *   - 32 bit -> BYTE_T:  4 input beats are packed into 1 output beat.
+ *   - 64 bit -> INT32_T: 2 input beats are packed into 1 output beat.
  *
  * Narrowing keeps the low bytes of every element (truncation), which is correct for signed and
  * unsigned values as long as they fit the narrower type.
@@ -28,10 +29,11 @@ module TypedNDataCast
 );
 
 // The output beat is filled in quarters: one 32 bit -> 8 bit input beat fills one quarter, one
-// 32 bit -> 16 bit input beat two quarters, and a pass-through beat all four.
+// 32 bit -> 16 bit or 64 bit -> 32 bit input beat two quarters, and a pass-through beat all four.
 localparam NUM_QUARTERS  = 4;
 localparam QUARTER_SIZE  = DATABEAT_SIZE / NUM_QUARTERS; // Bytes per quarter
 localparam NUM_32B_LANES = DATABEAT_SIZE / 4;            // 32 bit elements per input beat
+localparam NUM_64B_LANES = DATABEAT_SIZE / 8;            // 64 bit elements per input beat
 
 `ASSERT_ELAB(DATABEAT_SIZE % 16 == 0)
 
@@ -79,27 +81,29 @@ end
 assign out_type.ready = !keep_type.valid;
 
 // -- Mode -----------------------------------------------------------------------------------------
-logic narrow_16, narrow_8;
-assign narrow_16 = typ.data == INT16_T && GET_TYPE_WIDTH(in.typ) == 32;
-assign narrow_8  = typ.data == BYTE_T  && GET_TYPE_WIDTH(in.typ) == 32;
+logic narrow_32, narrow_16, narrow_8, narrow_half;
+assign narrow_32   = typ.data == INT32_T && GET_TYPE_WIDTH(in.typ) == 64;
+assign narrow_16   = typ.data == INT16_T && GET_TYPE_WIDTH(in.typ) == 32;
+assign narrow_8    = typ.data == BYTE_T  && GET_TYPE_WIDTH(in.typ) == 32;
+assign narrow_half = narrow_32 || narrow_16; // Each input beat fills half an output beat
 
 `ifndef SYNTHESIS
 assert property (@(posedge clk) disable iff (!rst_n)
-    !(in.valid && typ.valid) || narrow_16 || narrow_8 || GET_TYPE_WIDTH(typ.data) == GET_TYPE_WIDTH(in.typ))
+    !(in.valid && typ.valid) || narrow_half || narrow_8 || GET_TYPE_WIDTH(typ.data) == GET_TYPE_WIDTH(in.typ))
 else $fatal(1, "TypedNDataCast does not support casting type %0d to type %0d", in.typ, typ.data);
 
 assert property (@(posedge clk) disable iff (!rst_n)
-    !(in.valid && typ.valid && (narrow_16 || narrow_8) && !in.last) || &in.keep)
+    !(in.valid && typ.valid && (narrow_half || narrow_8) && !in.last) || &in.keep)
 else $fatal(1, "TypedNDataCast requires a dense input when narrowing");
 `endif
 
 // -- Narrowed input -------------------------------------------------------------------------------
-// The 16 bit values of one input beat span two quarters, the 8 bit values one quarter.
-data8_t[2 * QUARTER_SIZE - 1:0] data_16_bytes;
-logic  [2 * QUARTER_SIZE - 1:0] keep_16_bytes;
+// The 16 bit and the 32 bit values of one input beat span two quarters, the 8 bit values one quarter.
+data8_t[2 * QUARTER_SIZE - 1:0] data_16_bytes, data_32_bytes;
+logic  [2 * QUARTER_SIZE - 1:0] keep_16_bytes, keep_32_bytes;
 
-quarter_t     [1:0] data_16;
-quarter_keep_t[1:0] keep_16;
+quarter_t     [1:0] data_half;
+quarter_keep_t[1:0] keep_half;
 quarter_t           data_8;
 quarter_keep_t      keep_8;
 
@@ -113,8 +117,15 @@ for (genvar I = 0; I < NUM_32B_LANES; I++) begin
     assign keep_8[I] = in.keep[4 * I];
 end
 
-assign data_16 = data_16_bytes;
-assign keep_16 = keep_16_bytes;
+for (genvar I = 0; I < NUM_64B_LANES; I++) begin
+    for (genvar B = 0; B < 4; B++) begin
+        assign data_32_bytes[4 * I + B] = in.data[8 * I + B];
+        assign keep_32_bytes[4 * I + B] = in.keep[8 * I];
+    end
+end
+
+assign data_half = narrow_32 ? data_32_bytes : data_16_bytes;
+assign keep_half = narrow_32 ? keep_32_bytes : keep_16_bytes;
 
 // -- Gearbox --------------------------------------------------------------------------------------
 logic[1:0] pos, n_pos; // Next quarter to fill
@@ -133,7 +144,7 @@ logic                              valid, n_valid;
 assign in_quarters      = in.data;
 assign in_quarters_keep = in.keep;
 
-assign step      = narrow_8 ? 3'd1 : narrow_16 ? 3'd2 : 3'd4;
+assign step      = narrow_8 ? 3'd1 : narrow_half ? 3'd2 : 3'd4;
 assign beat_full = 3'(pos) + step == 3'(NUM_QUARTERS);
 
 assign in.ready = typ.valid && (!valid || out.ready);
@@ -175,10 +186,10 @@ always_comb begin
                     n_data[q] = data_8;
                     n_keep[q] = keep_8;
                 end
-            end else if (narrow_16) begin
+            end else if (narrow_half) begin
                 if (pos[1] == 1'(q / 2)) begin
-                    n_data[q] = data_16[q % 2];
-                    n_keep[q] = keep_16[q % 2];
+                    n_data[q] = data_half[q % 2];
+                    n_keep[q] = keep_half[q % 2];
                 end
             end else begin
                 n_data[q] = in_quarters[q];
