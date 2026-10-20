@@ -58,8 +58,8 @@ module StreamWriter
 `RESET_RESYNC // Reset pipelining
 
 // -- Parameters -----------------------------------------------------------------------------------
-// For RDMA, Coyote parses APP_WRITE requests into packets of at most the PMTU
-localparam OPCODE = IS_LOCAL ? LOCAL_WRITE : APP_WRITE;
+// For RDMA, Coyote parses RDMA_WRITE requests into packets of at most the PMTU
+localparam OPCODE = IS_LOCAL ? LOCAL_WRITE : RDMA_WRITE;
 // How many bits we need to address one transfer of size TRANSFER_LENGTH_BYTES
 localparam TRANSFER_ADDRESS_LEN_BITS = $clog2(TRANSFER_LENGTH_BYTES) + 1;
 localparam AXI_DATA_BYTES = (AXI_DATA_BITS / 8);
@@ -275,9 +275,6 @@ always_comb begin
 
     sq_wr.data.opcode = OPCODE;
     sq_wr.data.strm   = STRM;
-    sq_wr.data.mode   = RDMA_MODE_PARSE;
-    sq_wr.data.rdma   = ~IS_LOCAL;
-    sq_wr.data.remote = ~IS_LOCAL;
 
     // Note: We always send to coyote thread id 0.
     sq_wr.data.pid  = 0;

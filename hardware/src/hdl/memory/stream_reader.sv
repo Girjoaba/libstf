@@ -48,8 +48,8 @@ module StreamReader
 `RESET_RESYNC // Reset pipelining
 
 // -- Parameters -----------------------------------------------------------------------------------
-// For RDMA, Coyote parses APP_READ requests into read requests of at most the PMTU
-localparam OPCODE = IS_LOCAL ? LOCAL_READ : APP_READ;
+// For RDMA, Coyote parses RDMA_READ requests into read requests of at most the PMTU
+localparam OPCODE = IS_LOCAL ? LOCAL_READ : RDMA_READ;
 // How many bits we need to address one transfer of size TRANSFER_LENGTH_BYTES
 localparam TRANSFER_ADDRESS_LEN_BITS = $clog2(TRANSFER_LENGTH_BYTES) + 1;
 localparam AXI_DATA_BYTES = (AXI_DATA_BITS / 8);
@@ -131,9 +131,6 @@ always_comb begin
 
     sq_rd.data.opcode = OPCODE;
     sq_rd.data.strm   = STRM;
-    sq_rd.data.mode   = RDMA_MODE_PARSE;
-    sq_rd.data.rdma   = ~IS_LOCAL;
-    sq_rd.data.remote = ~IS_LOCAL;
 
     // Note: We always send to coyote thread id 0.
     sq_rd.data.pid  = 0;
