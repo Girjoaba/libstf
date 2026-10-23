@@ -109,10 +109,11 @@ void OutputBufferManager::handle_fpga_interrupt(int coyote_value) {
     // 2. Move buffer from enqueued to it's corresponding handle
     move_current_buffer_to_handle(parsed.stream_id, parsed.bytes_written, parsed.last);
 
-    // 3. Enqueue new buffer — only for managed streams. Unmanaged streams have a single buffer of
-    //    the exact size enqueued at acquire time and do not get speculatively topped up.
+    // 3. Top up the buffers — only for managed streams. Unmanaged streams have a single buffer of
+    //    the exact size enqueued at acquire time and do not get speculatively topped up. An empty
+    //    stream may not have consumed its buffer, so only replace what was actually used.
     if (MANAGED_STREAMS.test(parsed.stream_id)) {
-        enqueue_buffer_for_stream(parsed.stream_id);
+        ensure_stream_has_buffers(parsed.stream_id);
     }
     Profiler::close_regions({prefix + "handle_fpga_interrupt"});
 }
